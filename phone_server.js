@@ -152,7 +152,7 @@ var passwordValidator = Match.OneOf(
 // Note that neither password option is secure without SSL.
 //
 Accounts.registerLoginHandler("phone", function (options) {
-    if (!options.password || options.srp)
+    if (!options.password || options.srp || options.user.username || options.user.email)
         return undefined; // don't handle
 
     check(options, {
@@ -708,4 +708,3 @@ var getRandomCode = function (length) {
 var getRandomDigit = function () {
     return Math.floor((Math.random() * 9) + 1);
 }
-
