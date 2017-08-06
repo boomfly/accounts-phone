@@ -307,14 +307,14 @@ Accounts.sendPhoneVerificationCode = function (userId, phone) {
     // Make sure the user exists, and phone is one of their phones.
     var user = Meteor.users.findOne(userId);
     if (!user)
-        throw new Error("Can't find user");
+        throw new Meteor.Error(403, "Can't find user");
     // pick the first unverified phone if we weren't passed an phone.
     if (!phone && user.phone) {
         phone = user.phone && user.phone.number;
     }
     // make sure we have a valid phone
     if (!phone)
-        throw new Error("No such phone for user.");
+        throw new Meteor.Error(403, "No such phone for user.");
 
     // If sent more than max retry wait
     var waitTimeBetweenRetries = Accounts._options.verificationWaitTime;
@@ -331,7 +331,7 @@ Accounts.sendPhoneVerificationCode = function (userId, phone) {
     if (nextRetryDate && nextRetryDate > curTime) {
         var waitTimeInSec = Math.ceil(Math.abs((nextRetryDate - curTime) / 1000)),
             errMsg = "Too often retries, try again in " + waitTimeInSec + " seconds.";
-        throw new Error(errMsg);
+        throw new Meteor.Error(403, errMsg);
     }
     // Check if there where too many retries
     if (verifyObject.numOfRetries > maxRetryCounts) {
@@ -341,10 +341,21 @@ Accounts.sendPhoneVerificationCode = function (userId, phone) {
         if (nextRetryDate > curTime) {
             var waitTimeInMin = Math.ceil(Math.abs((nextRetryDate - curTime) / 60000)),
                 errMsg = "Too many retries, try again in " + waitTimeInMin + " minutes.";
-            throw new Error(errMsg);
+            throw new Meteor.Error(403, errMsg);
         }
     }
-    verifyObject.code = getRandomCode(Accounts._options.verificationCodeLength);
+
+    // Evade duplicate key error for services.phone.verify.code
+    var codeGenerated = false;
+    var code;
+    while (!codeGenerated) {
+      code = getRandomCode(Accounts._options.verificationCodeLength);
+      if (!Meteor.users.findOne({'services.phone.verify.code': code})) {
+        codeGenerated = true;
+      }
+    }
+
+    verifyObject.code = code;
     verifyObject.phone = phone;
     verifyObject.lastRetry = curTime;
     verifyObject.numOfRetries++;
@@ -483,7 +494,7 @@ Meteor.methods({verifyPhone: function (phone, code, newPassword) {
 
             // Replace all valid login tokens with new ones (changing
             // password should invalidate existing sessions).
-            Accounts._clearAllLoginTokens(user._id);
+            //Accounts._clearAllLoginTokens(user._id);
 
             return {userId: user._id};
         }
